@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment
+.env
+.env.local
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Custom training data (students' images)
+public/training-library/*
+!public/training-library/cat/
+!public/training-library/dog/
+!public/training-library/.gitkeep
+
+# Uploads temp folder
+uploads/
+
+# Logs
+*.log
+npm-debug.log*
