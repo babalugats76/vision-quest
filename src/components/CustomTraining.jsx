@@ -4,7 +4,7 @@ import * as mobilenet from '@tensorflow-models/mobilenet';
 import ConfidenceVisualizer from './ConfidenceVisualizer';
 
 function CustomTraining() {
-  const [categories, setCategories] = useState(['cat', 'dog']);
+  const [categories, setCategories] = useState(['burger', 'taco']);
   const [trainingImages, setTrainingImages] = useState({});
   const [model, setModel] = useState(null);
   const [training, setTraining] = useState(false);
@@ -19,103 +19,155 @@ function CustomTraining() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = imagePath;
-    
+
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
     });
-    
+
     return img;
   }
 
   // Helper: Create model architecture (PROVIDED)
   function createModel() {
     const model = tf.sequential();
-    
-    model.add(tf.layers.dense({
-      inputShape: [1024],
-      units: 128,
-      activation: 'relu'
-    }));
-    
+
+    model.add(
+      tf.layers.dense({
+        inputShape: [1024],
+        units: 128,
+        activation: 'relu',
+      })
+    );
+
     model.add(tf.layers.dropout({ rate: 0.5 }));
-    
-    model.add(tf.layers.dense({
-      units: 2,
-      activation: 'softmax'
-    }));
-    
+
+    model.add(
+      tf.layers.dense({
+        units: 2,
+        activation: 'softmax',
+      })
+    );
+
     model.compile({
       optimizer: tf.train.adam(0.001),
       loss: 'categoricalCrossentropy',
-      metrics: ['accuracy']
+      metrics: ['accuracy'],
     });
-    
+
     return model;
   }
 
   // Training configuration (PROVIDED)
-  const trainingConfig = useMemo(() => ({
-    epochs: 20,
-    batchSize: 8,
-    validationSplit: 0.2,
-    callbacks: {
-      onEpochEnd: (epoch, logs) => {
-        setProgress({
-          epoch: epoch + 1,
-          loss: logs.loss.toFixed(4),
-          accuracy: (logs.acc * 100).toFixed(1)
-        });
-      }
-    }
-  }), []);
+  const trainingConfig = useMemo(
+    () => ({
+      epochs: 20,
+      batchSize: 8,
+      validationSplit: 0.2,
+      callbacks: {
+        onEpochEnd: (epoch, logs) => {
+          setProgress({
+            epoch: epoch + 1,
+            loss: logs.loss.toFixed(4),
+            accuracy: (logs.acc * 100).toFixed(1),
+          });
+        },
+      },
+    }),
+    []
+  );
 
   // SESSION-02: Students add image path generation logic
   function generateImagePaths(category, count) {
     const paths = [];
+
+    // Generate path for each image in the category
+    for (let i = 1; i <= count; i++) {
+      const file = `${category}-${String(i).padStart(2, '0')}.jpg`;
+      const path = `/training-library/${category}/${file}`;
+      paths.push(path);
+    }
+
     return paths;
   }
 
   // SESSION-02: Students add loading logic
   function loadTrainingImages() {
     console.log('Loading training images...');
+
+    // Add path generation logic:
+    const images = {};
+
+    for (const category of categories) {
+      images[category] = generateImagePaths(category, 30);
+    }
+
+    setTrainingImages(images);
+
+    const total = categories.length * 30;
+    console.log(`Loaded ${total} training images`);
   }
 
   // SESSION-03: Students add tensor creation logic
   async function createTrainingData() {
     console.log('Creating training data...');
-    
+
     const features = [];
     const labels = [];
-    
+
     const net = await mobilenet.load();
-    
-    return { features: null, labels: null };
+
+    // Add category processing:
+    for (const category of categories) {
+      const categoryIndex = categories.indexOf(category);
+
+      for (const path of trainingImages[category]) {
+        const img = await loadImage(path);
+        const feature = net.infer(img, true);
+        features.push(feature);
+        labels.push(categoryIndex);
+      }
+
+      const count = trainingImages[category].length;
+      console.log(`Processed ${count} ${category} images`);
+    }
+
+    const fTensor = tf.stack(features).squeeze([1]);
+    const lTensor = tf.oneHot(tf.tensor1d(labels, 'int32'), categories.length);
+
+    features.forEach(feature => feature.dispose());
+
+    console.log('Training data created');
+    return { features: fTensor, labels: lTensor };
   }
 
   // SESSION-03: Students add training logic
   async function trainModel() {
-    const hasAllImages = categories.every(
-      cat => trainingImages[cat]?.length > 0
-    );
+    const hasAllImages = categories.every(cat => trainingImages[cat]?.length > 0);
     if (!hasAllImages) {
       alert('Load training images first!');
       return;
     }
 
     setTraining(true);
-    
+
     try {
       const data = await createTrainingData();
       const model = createModel();
-      
+
+      // Add training:
+      await model.fit(data.features, data.labels, trainingConfig);
+
       setModel(model);
       console.log('Training complete!');
+
+      data.features.dispose();
+      data.labels.dispose();
     } catch (error) {
       console.error('Training error:', error);
       alert('Training failed. Check console for details.');
     }
-    
+
     setTraining(false);
   }
 
@@ -127,26 +179,24 @@ function CustomTraining() {
     }
 
     console.log('Classifying image...');
-    
+
     try {
-      const img = typeof imageSource === 'string' 
-        ? await loadImage(imageSource)
-        : imageSource;
-      
+      const img = typeof imageSource === 'string' ? await loadImage(imageSource) : imageSource;
+
       const net = await mobilenet.load();
       const features = net.infer(img, true).squeeze();
-      
+
       const prediction = model.predict(features.expandDims(0));
       const probabilities = await prediction.data();
-      
+
       const result = {
         className: probabilities[0] > probabilities[1] ? categories[0] : categories[1],
-        probability: Math.max(probabilities[0], probabilities[1])
+        probability: Math.max(probabilities[0], probabilities[1]),
       };
-      
+
       setPrediction(result);
       console.log('Prediction:', result);
-      
+
       features.dispose();
       prediction.dispose();
     } catch (error) {
@@ -175,7 +225,7 @@ function CustomTraining() {
     setPrediction(null);
     const imageUrl = URL.createObjectURL(file);
     setImagePreview(imageUrl);
-    
+
     const img = new Image();
     img.onload = () => {
       classifyImage(img);
@@ -191,8 +241,8 @@ function CustomTraining() {
     }
 
     try {
-      await model.save('downloads://custom-model');
-      
+      await model.save('downloads://model');
+
       const data = JSON.stringify({ categories }, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -201,7 +251,7 @@ function CustomTraining() {
       a.download = 'categories.json';
       a.click();
       URL.revokeObjectURL(url);
-      
+
       console.log('Model saved to downloads!');
       alert('Model saved! Check your Downloads folder for model files and categories.json');
     } catch (error) {
@@ -215,11 +265,11 @@ function CustomTraining() {
     try {
       const model = await tf.loadLayersModel('/saved-models/custom/model.json');
       setModel(model);
-      
+
       const response = await fetch('/saved-models/custom/categories.json');
       const data = await response.json();
       setCategories(data.categories);
-      
+
       console.log('Saved model loaded!');
       alert('Saved model loaded successfully!');
     } catch (error) {
@@ -242,12 +292,8 @@ function CustomTraining() {
 
       <div className="card">
         <h3>Training Images</h3>
-        
-        <button 
-          className="btn primary mb-3" 
-          onClick={loadTrainingImages}
-          disabled={hasImages}
-        >
+
+        <button className="btn primary mb-3" onClick={loadTrainingImages} disabled={hasImages}>
           {hasImages ? '✅ Images Loaded' : 'Load Training Images'}
         </button>
 
@@ -279,13 +325,13 @@ function CustomTraining() {
 
       <div className="card">
         <h3>Model Training</h3>
-        
+
         <div className="mb-3">
           <label className="flex align-center gap-1">
             <input
               type="checkbox"
               checked={useSavedModel}
-              onChange={(e) => setUseSavedModel(e.target.checked)}
+              onChange={e => setUseSavedModel(e.target.checked)}
             />
             <span>Use saved model (skip training)</span>
           </label>
@@ -295,17 +341,13 @@ function CustomTraining() {
         </div>
 
         {useSavedModel ? (
-          <button 
-            className="btn primary mb-3" 
-            onClick={loadSavedModel}
-            disabled={model}
-          >
+          <button className="btn primary mb-3" onClick={loadSavedModel} disabled={model}>
             {model ? '✅ Model Loaded' : 'Load Saved Model'}
           </button>
         ) : (
           <>
-            <button 
-              className="btn primary mb-3" 
+            <button
+              className="btn primary mb-3"
               onClick={trainModel}
               disabled={training || !hasImages}
             >
@@ -321,10 +363,7 @@ function CustomTraining() {
             )}
 
             {model && (
-              <button 
-                className="btn secondary mb-3" 
-                onClick={saveModel}
-              >
+              <button className="btn secondary mb-3" onClick={saveModel}>
                 💾 Save Model for Deployment
               </button>
             )}
@@ -335,10 +374,10 @@ function CustomTraining() {
       {model && (
         <div className="card">
           <h3>Test Your Model</h3>
-          
+
           <div className="mb-3">
             <h4>Single Image Test</h4>
-            
+
             <div className="mb-2">
               <p className="text-muted mb-1">Option 1: Use Image URL</p>
               <div className="flex flex-gap">
@@ -347,7 +386,7 @@ function CustomTraining() {
                   className="input flex-1"
                   placeholder="https://example.com/image.jpg"
                   value={testImageUrl}
-                  onChange={(e) => setTestImageUrl(e.target.value)}
+                  onChange={e => setTestImageUrl(e.target.value)}
                 />
                 <button className="btn primary" onClick={handleImageUrl}>
                   Test
@@ -362,11 +401,7 @@ function CustomTraining() {
               <p className="text-muted mb-1">Option 2: Upload from Computer</p>
               <label className="file-upload-label">
                 Choose Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                />
+                <input type="file" accept="image/*" onChange={handleImageUpload} />
               </label>
             </div>
           </div>
@@ -374,11 +409,7 @@ function CustomTraining() {
           {imagePreview && (
             <div className="mb-3">
               <h3>Image:</h3>
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="image-preview"
-              />
+              <img src={imagePreview} alt="Preview" className="image-preview" />
             </div>
           )}
 

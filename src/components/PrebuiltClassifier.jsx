@@ -16,12 +16,12 @@ function PrebuiltClassifier() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = url;
-    
+
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
     });
-    
+
     return img;
   }
 
@@ -29,14 +29,19 @@ function PrebuiltClassifier() {
   async function loadModel() {
     setLoading(true);
     console.log('Loading model...');
-    
+
     try {
+      // Add model loading:
+      await tf.setBackend('webgl');
+      await tf.ready();
+      const model = await mobilenet.load();
+      setModel(model);
       console.log('Model loaded successfully!');
     } catch (error) {
       console.error('Error loading model:', error);
       alert('Failed to load model. Check console for details.');
     }
-    
+
     setLoading(false);
   }
 
@@ -51,6 +56,11 @@ function PrebuiltClassifier() {
     console.log('Classifying image...');
 
     try {
+      // Add classification:
+      const predictions = await model.classify(img);
+      console.log('Predictions:', predictions);
+      setPrediction(predictions[0]);
+
       console.log('Classification complete');
     } catch (error) {
       console.error('Error classifying image:', error);
@@ -67,7 +77,7 @@ function PrebuiltClassifier() {
 
     const imageUrl = URL.createObjectURL(file);
     setImagePreview(imageUrl);
-    
+
     const img = new Image();
     img.onload = () => {
       classifyImage(img);
@@ -100,18 +110,14 @@ function PrebuiltClassifier() {
           including cats and dogs. Let's see how well it works!
         </p>
 
-        <button 
-          className="btn primary mb-3" 
-          onClick={loadModel} 
-          disabled={loading || model}
-        >
+        <button className="btn primary mb-3" onClick={loadModel} disabled={loading || model}>
           {loading ? 'Loading...' : model ? '✅ Model Loaded' : 'Load Model'}
         </button>
 
         {model && (
           <div className="mb-3">
             <h3>Test Single Image</h3>
-            
+
             <div className="mb-2">
               <p className="text-muted mb-1">Option 1: Use Image URL</p>
               <div className="flex flex-gap">
@@ -120,7 +126,7 @@ function PrebuiltClassifier() {
                   className="input flex-1"
                   placeholder="https://example.com/image.jpg"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={e => setImageUrl(e.target.value)}
                   disabled={loading}
                 />
                 <button className="btn primary" onClick={handleImageUrl} disabled={loading}>
@@ -150,11 +156,7 @@ function PrebuiltClassifier() {
         {imagePreview && (
           <div className="mb-3">
             <h3>Image:</h3>
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="image-preview"
-            />
+            <img src={imagePreview} alt="Preview" className="image-preview" />
           </div>
         )}
 

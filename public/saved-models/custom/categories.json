@@ -1,3 +1,6 @@
 {
-  "categories": ["cat", "dog"]
+  "categories": [
+    "burger",
+    "taco"
+  ]
 }
