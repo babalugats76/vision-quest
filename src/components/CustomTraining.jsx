@@ -284,10 +284,7 @@ function CustomTraining() {
     <div>
       <div className="card">
         <h2>Custom Training</h2>
-        <p>
-          Train your own cat vs dog classifier using transfer learning. Can you match MobileNet's
-          95% accuracy with only 60 images?
-        </p>
+        <p>Train your own image classifier using transfer learning with custom categories.</p>
       </div>
 
       <div className="card">
