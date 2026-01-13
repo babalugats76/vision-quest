@@ -263,10 +263,10 @@ function CustomTraining() {
   // SESSION-05: Students add model load logic
   async function loadSavedModel() {
     try {
-      const model = await tf.loadLayersModel('/saved-models/custom/model.json');
+      const model = await tf.loadLayersModel('saved-models/custom/model.json');
       setModel(model);
 
-      const response = await fetch('/saved-models/custom/categories.json');
+      const response = await fetch('saved-models/custom/categories.json');
       const data = await response.json();
       setCategories(data.categories);
 
